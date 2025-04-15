@@ -1,5 +1,5 @@
 {
-    "idf.portWin": "COM22",
+    "idf.portWin": "COM23",
     "idf.customExtraVars": {
         "IDF_TARGET": "esp32c3"
     },

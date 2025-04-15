@@ -1,4 +1,3 @@
-
 /*
  *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
@@ -45,6 +44,11 @@
 #define UART_RX_PIN 5  // GPIO5
 #define UART_BAUD_RATE 57600
 
+// Heartbeat configuration
+#define HEARTBEAT_INTERVAL_MS 1000
+#define CUSTOM_SYS_ID 200
+#define CUSTOM_COMP_ID 200
+
 static const char *TAG = "DB_ESP32";
 
 /**
@@ -69,110 +73,53 @@ void init_uart() {
 }
 
 /**
- * Format and print a buffer as hex and ASCII
+ * Heartbeat sending task
  */
-void print_buffer(const uint8_t *data, int len) {
-    if (len <= 0) return;
-    
-    printf("\n--- UART Message (%d bytes) ---\n", len);
-    
-    // Print in hex with 16 bytes per line
-    for (int i = 0; i < len; i += 16) {
-        printf("%04X: ", i);
-        
-        // Hex portion
-        for (int j = 0; j < 16; j++) {
-            if (i + j < len) {
-                printf("%02X ", data[i + j]);
-            } else {
-                printf("   ");
-            }
-            if (j == 7) printf(" ");  // Extra space after 8 bytes
-        }
-        
-        // ASCII portion
-        printf(" |");
-        for (int j = 0; j < 16; j++) {
-            if (i + j < len) {
-                char c = data[i + j];
-                // Print only printable ASCII characters
-                if (c >= 32 && c <= 126) {
-                    printf("%c", c);
-                } else {
-                    printf(".");
-                }
-            } else {
-                printf(" ");
-            }
-        }
-        printf("|\n");
-    }
-    printf("-----------------------------\n");
-}
-
-/**
- * Parse MAVLink message using FastMAVLink library
- */
-void parse_mavlink_message(const uint8_t *data, int len) {
-    // Setup parser status
-    fmav_status_t status;
-    fmav_status_reset(&status);
-    
-    // Setup message structure
-    fmav_message_t msg;
-
-    int the_one = 0;  // Reset the message counter
-    // Parse byte by byte
-    for (int i = 0; i < len; i++) {
-        if (fmav_parse_to_msg(&msg, &status, data[i])) {
-            // Check if it's a heartbeat with sysid=200 and compid=200
-            if (msg.msgid == FASTMAVLINK_MSG_ID_HEARTBEAT && 
-                msg.sysid == 200 && 
-                msg.compid == 200) {
-                the_one = 1;  // Set the flag to indicate a heartbeat was received
-                // Print a single, concise message for this heartbeat
-                
-            }
-        }
-    }
-    if (the_one) {
-        ESP_LOGI(TAG, "Heartbeat received from sysid=200, compid=200");
-        printf("\n--- Heartbeat received from sysid=200, compid=200---\n");
-    } else {
-        ESP_LOGI(TAG, "No heartbeat received from sysid=200, compid=200");
-    }
-}
-/**
- * UART monitoring task
- */
-void uart_monitor_task(void *pvParameters) {
+void heartbeat_task(void *pvParameters) {
     uint8_t buffer[UART_BUFFER_SIZE];
-    int rx_bytes = 0;
+    fmav_status_t fmav_status = {0};
+    fmav_message_t msg;
     
-    ESP_LOGI(TAG, "UART monitoring task started");
+    ESP_LOGI(TAG, "Heartbeat task started, sending every %d ms", HEARTBEAT_INTERVAL_MS);
+    
+    // Log first heartbeat explicitly
+    ESP_LOGI(TAG, "Sending first heartbeat...");
     
     while (1) {
-        // Read data from UART
-        rx_bytes = uart_read_bytes(UART_NUM, buffer, UART_BUFFER_SIZE, pdMS_TO_TICKS(100));
+        // Use the fmav_msg_heartbeat_pack function directly to create a heartbeat message
+        fmav_msg_heartbeat_pack(
+            &msg,
+            CUSTOM_SYS_ID,        // System ID
+            CUSTOM_COMP_ID,       // Component ID
+            MAV_TYPE_ONBOARD_CONTROLLER,  // Type
+            MAV_AUTOPILOT_INVALID,        // Autopilot
+            MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,  // Base mode
+            0,                             // Custom mode
+            MAV_STATE_ACTIVE,              // System status
+            &fmav_status
+        );
         
-        if (rx_bytes > 0) {
-            // Print timestamp
-            // int64_t time = esp_timer_get_time();
-            
-            // Print formatted buffer
-            // print_buffer(buffer, rx_bytes);
-            
-            // Parse MAVLink messages using the official library
-            parse_mavlink_message(buffer, rx_bytes);
-            
-            // Echo data back if needed
-            // uart_write_bytes(UART_NUM, buffer, rx_bytes);
+        // Pack the message into a buffer for transmission
+        // CORRECTED: fmav_msg_to_frame_buf only takes 2 parameters
+        uint16_t len = fmav_msg_to_frame_buf(buffer, &msg);
+        
+        // Send the heartbeat via UART
+        int bytes_sent = uart_write_bytes(UART_NUM, buffer, len);
+        
+        if (bytes_sent == len) {
+            ESP_LOGI(TAG, "Heartbeat sent successfully (sysid=%d, compid=%d, %d bytes)", 
+                    CUSTOM_SYS_ID, CUSTOM_COMP_ID, bytes_sent);
+        } else {
+            ESP_LOGW(TAG, "Failed to send complete heartbeat (%d/%d bytes sent)", 
+                    bytes_sent, len);
         }
+        
+        // Wait for the next interval
+        vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS));
     }
 }
-
 /**
- * Main entry point - simplified for UART monitoring only
+ * Main entry point
  */
 void app_main() {
     // Initialize NVS (still needed for parameters)
@@ -183,14 +130,20 @@ void app_main() {
     }
     ESP_ERROR_CHECK(ret);
     
-    ESP_LOGI(TAG, "Starting DroneBridge UART Monitor");
+    ESP_LOGI(TAG, "Starting DroneBridge Heartbeat Sender");
     
     // Initialize UART
     init_uart();
     
-    // Create UART monitoring task
-    xTaskCreate(uart_monitor_task, "uart_monitor_task", 4096, NULL, 5, NULL);
+    // Create heartbeat sending task
+    TaskHandle_t heartbeatTaskHandle = NULL;
+    if (xTaskCreate(heartbeat_task, "heartbeat_task", 4096, NULL, 5, &heartbeatTaskHandle) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create heartbeat task!");
+    } else {
+        ESP_LOGI(TAG, "Heartbeat task created successfully");
+    }
     
-    ESP_LOGI(TAG, "UART monitor initialized and running");
+    ESP_LOGI(TAG, "Heartbeat sender initialized and running");
     ESP_LOGI(TAG, "Configured for UART%d: TX=%d, RX=%d, Baud=%d", UART_NUM, UART_TX_PIN, UART_RX_PIN, UART_BAUD_RATE);
+    ESP_LOGI(TAG, "Sending heartbeats with sysid=%d, compid=%d every %d ms", CUSTOM_SYS_ID, CUSTOM_COMP_ID, HEARTBEAT_INTERVAL_MS);
 }
