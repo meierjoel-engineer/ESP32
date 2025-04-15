@@ -42,33 +42,33 @@
 #define MAX_LTM_FRAMES_IN_BUFFER    5
 
 
-#ifdef CONFIG_DB_OFFICIAL_BOARD_1_X
-#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_5
-#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_4
-#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_6
-#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_7
-#define DB_DEFAULT_UART_BAUD_RATE 115200
-#elif CONFIG_DB_OFFICIAL_BOARD_1_X_C6
-#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_21
-#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_2
-#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_22
-#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_23
-#define DB_DEFAULT_UART_BAUD_RATE 115200
-#elif CONFIG_DB_GENERIC_BOARD
-// initially set pins to 0 to allow the start of the system on all boards. User has to set the correct pins
-#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_0
+// #ifdef CONFIG_DB_OFFICIAL_BOARD_1_X
+// #define DB_DEFAULT_UART_TX_PIN GPIO_NUM_5
+// #define DB_DEFAULT_UART_RX_PIN GPIO_NUM_4
+// #define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_6
+// #define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_7
+// #define DB_DEFAULT_UART_BAUD_RATE 115200
+// #elif CONFIG_DB_OFFICIAL_BOARD_1_X_C6
+// #define DB_DEFAULT_UART_TX_PIN GPIO_NUM_21
+// #define DB_DEFAULT_UART_RX_PIN GPIO_NUM_2
+// #define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_22
+// #define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_23
+// #define DB_DEFAULT_UART_BAUD_RATE 115200
+// #elif CONFIG_DB_GENERIC_BOARD
+// // initially set pins to 0 to allow the start of the system on all boards. User has to set the correct pins
+// #define DB_DEFAULT_UART_TX_PIN GPIO_NUM_0
+// #define DB_DEFAULT_UART_RX_PIN GPIO_NUM_0
+// #define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_0
+// #define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_0
+// #define DB_DEFAULT_UART_BAUD_RATE 57600
+// #else
+// // someone fucked up the config - fallback to generic config
+#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_4
+#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_5
+#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_7
+#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_6
 #define DB_DEFAULT_UART_BAUD_RATE 57600
-#else
-// someone fucked up the config - fallback to generic config
-#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_BAUD_RATE 57600
-#endif
+// #endif
 
 /* ---------- Optional Macros for quick access to param values ---------- */
 #define DB_PARAM_WIFI_SSID (char *) db_param_ssid.value.db_param_str.value
